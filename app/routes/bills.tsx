@@ -6,6 +6,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { compareBill, getEffectiveRate } from "~/lib/domain/calc";
 import { formatEur, formatM3 } from "~/lib/domain/format";
+import { enforceRateLimit, enforceSameOrigin } from "~/lib/server/security";
 import {
   addBill,
   deleteBill,
@@ -38,6 +39,9 @@ export async function loader(_: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs) {
+  enforceSameOrigin(request);
+  enforceRateLimit(request, "bills-action", 60, 10 * 60_000);
+
   const formData = await request.formData();
   const intent = String(formData.get("intent") || "add");
 

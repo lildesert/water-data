@@ -2,27 +2,20 @@ import { Form, useActionData } from "react-router";
 
 import { Button } from "~/components/ui/button";
 import { Card, CardDescription, CardTitle } from "~/components/ui/card";
+import { parseReadingsCsv } from "~/lib/server/csv";
 import { addReading, listAllReadings } from "~/lib/server/queries";
+import { enforceRateLimit, enforceSameOrigin } from "~/lib/server/security";
 
 import type { Route } from "./+types/import";
-
-function normalizeDate(raw: string) {
-  const v = raw.trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
-  const fr = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (fr) {
-    const dd = fr[1].padStart(2, "0");
-    const mm = fr[2].padStart(2, "0");
-    return `${fr[3]}-${mm}-${dd}`;
-  }
-  return null;
-}
 
 export function meta(_: Route.MetaArgs) {
   return [{ title: "Import | Water Tracker" }];
 }
 
 export async function action({ request }: Route.ActionArgs) {
+  enforceSameOrigin(request);
+  enforceRateLimit(request, "import-action", 20, 10 * 60_000);
+
   const formData = await request.formData();
   const file = formData.get("csvFile");
 
@@ -31,44 +24,22 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   const text = await file.text();
-  const lines = text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  if (lines.length < 2) {
+  if (!text.trim()) {
     return { error: "CSV should include a header and at least one data row." };
   }
-
-  const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
-  const dateIdx = headers.findIndex((h) => h.includes("date"));
-  const meterIdx = headers.findIndex(
-    (h) => h.includes("meter") || h.includes("index") || h.includes("volume"),
-  );
-
-  if (dateIdx < 0 || meterIdx < 0) {
-    return {
-      error:
-        "Could not detect date and meter columns. Use headers like date,meter_index.",
-    };
+  const parsed = parseReadingsCsv(text);
+  if (parsed.rows.length === 0) {
+    return { error: parsed.errors[0] ?? "No valid rows found in CSV." };
   }
 
   const existing = new Set((await listAllReadings()).map((r) => r.readingDate));
 
   let imported = 0;
   let skipped = 0;
-  let rejected = 0;
+  let rejected = parsed.rejected;
 
-  for (const line of lines.slice(1)) {
-    const cols = line.split(",");
-    const readingDate = normalizeDate(cols[dateIdx] || "");
-    const meterIndexM3 = Number((cols[meterIdx] || "").replace(",", "."));
-
-    if (!readingDate || Number.isNaN(meterIndexM3)) {
-      rejected += 1;
-      continue;
-    }
-
+  for (const row of parsed.rows) {
+    const { readingDate, meterIndexM3 } = row;
     if (existing.has(readingDate)) {
       skipped += 1;
       continue;
@@ -83,7 +54,12 @@ export async function action({ request }: Route.ActionArgs) {
     }
   }
 
-  return { imported, skipped, rejected };
+  return {
+    imported,
+    skipped,
+    rejected,
+    parserWarnings: parsed.errors.length,
+  };
 }
 
 export default function ImportRoute() {
@@ -118,6 +94,7 @@ export default function ImportRoute() {
         {actionData && "imported" in actionData ? (
           <div className="mt-3 rounded-xl border-2 border-black bg-lime-100 p-3 text-sm font-semibold">
             Imported: {actionData.imported} | Skipped: {actionData.skipped} | Rejected: {actionData.rejected}
+            {actionData.parserWarnings ? ` | Parser warnings: ${actionData.parserWarnings}` : ""}
           </div>
         ) : null}
       </Card>

@@ -6,6 +6,7 @@ import { Card, CardDescription, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { formatM3 } from "~/lib/domain/format";
+import { enforceRateLimit, enforceSameOrigin } from "~/lib/server/security";
 import {
   addReading,
   deleteReading,
@@ -31,6 +32,9 @@ export async function loader(_: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs) {
+  enforceSameOrigin(request);
+  enforceRateLimit(request, "entry-action", 120, 10 * 60_000);
+
   const formData = await request.formData();
   const intent = String(formData.get("intent") || "add");
 

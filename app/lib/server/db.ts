@@ -7,8 +7,11 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 
 import * as schema from "./schema";
 
-const dataDir = path.resolve(process.cwd(), "data");
-const dbPath = path.join(dataDir, "water.sqlite");
+const defaultDbPath = path.resolve(process.cwd(), "data", "water.sqlite");
+const dbPath = process.env.DATABASE_PATH
+  ? path.resolve(process.env.DATABASE_PATH)
+  : defaultDbPath;
+const dataDir = path.dirname(dbPath);
 
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });

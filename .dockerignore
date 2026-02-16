@@ -1,4 +1,9 @@
-.react-router
-build
+.git
+.gitignore
 node_modules
-README.md
+build
+.react-router
+data
+backups
+pnpm-debug.log*
+.DS_Store
