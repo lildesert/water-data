@@ -3,6 +3,7 @@ import Papa from "papaparse";
 export type ParsedReadingRow = {
   readingDate: string;
   meterIndexM3: number;
+  notes?: string;
 };
 
 function normalizeDate(raw: string) {
@@ -37,6 +38,7 @@ export function parseReadingsCsv(csvText: string) {
   const fields = parsed.meta.fields ?? [];
   const dateIdx = findColumn(fields, ["date"]);
   const meterIdx = findColumn(fields, ["meter", "index", "volume", "m3"]);
+  const notesIdx = findColumn(fields, ["notes", "note", "comment", "comments"]);
 
   if (dateIdx < 0 || meterIdx < 0) {
     return {
@@ -50,6 +52,7 @@ export function parseReadingsCsv(csvText: string) {
 
   const dateField = fields[dateIdx]!;
   const meterField = fields[meterIdx]!;
+  const notesField = notesIdx >= 0 ? fields[notesIdx]! : null;
 
   const rows: ParsedReadingRow[] = [];
   let rejected = 0;
@@ -57,13 +60,18 @@ export function parseReadingsCsv(csvText: string) {
   for (const row of parsed.data) {
     const readingDate = normalizeDate(String(row[dateField] ?? ""));
     const meterIndexM3 = normalizeNumber(String(row[meterField] ?? ""));
+    const rawNotes = notesField ? String(row[notesField] ?? "").trim() : "";
 
     if (!readingDate || meterIndexM3 === null) {
       rejected += 1;
       continue;
     }
 
-    rows.push({ readingDate, meterIndexM3 });
+    rows.push({
+      readingDate,
+      meterIndexM3,
+      notes: rawNotes.length > 0 ? rawNotes : undefined,
+    });
   }
 
   return {

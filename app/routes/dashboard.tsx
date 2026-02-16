@@ -64,8 +64,8 @@ export default function DashboardRoute() {
         {data.monthly.length < 2 ? (
           <p className="mt-6 text-sm text-zinc-600">Add at least 2 readings to unlock the chart.</p>
         ) : (
-          <div className="mt-4 h-[320px] w-full">
-            <ResponsiveContainer>
+          <div className="mt-4 w-full min-w-0">
+            <ResponsiveContainer width="100%" height={320} minWidth={0}>
               <BarChart data={data.monthly} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />

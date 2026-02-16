@@ -39,14 +39,14 @@ export async function action({ request }: Route.ActionArgs) {
   let rejected = parsed.rejected;
 
   for (const row of parsed.rows) {
-    const { readingDate, meterIndexM3 } = row;
+    const { readingDate, meterIndexM3, notes } = row;
     if (existing.has(readingDate)) {
       skipped += 1;
       continue;
     }
 
     try {
-      await addReading({ readingDate, meterIndexM3, source: "import" });
+      await addReading({ readingDate, meterIndexM3, notes, source: "import" });
       existing.add(readingDate);
       imported += 1;
     } catch {
